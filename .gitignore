@@ -1,0 +1,52 @@
+# PlatformIO
+.pio/
+.vscode/.browse.c_cpp.db*
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/ipch/
+
+# Build outputs
+*.bin
+*.elf
+*.map
+*.hex
+
+# Compiled files
+*.o
+*.obj
+*.a
+*.lib
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# IDE files
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# WiFi credentials (security)
+wifi_config.txt
+secrets.h
+credentials.h
+
+# SquareLine Studio files (when added later)
+# Uncomment when you start using SquareLine Studio:
+# src/ui/
+
+# Backup files
+*.bak
+*.backup
