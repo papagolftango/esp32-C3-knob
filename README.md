@@ -13,7 +13,9 @@ A professional knob interface built on ESP32-C3 with 360x360 round display, feat
 - **360x360 round display** with ST7789 driver
 - **Capacitive touch screen** support
 - **LVGL 8.3.0** graphics library integration
-- **WiFiManager** for secure credential storage
+- **WiFiManager** for secure credential storage (no hardcoded passwords)
+- **MQTT integration** with secure broker authentication
+- **Home automation ready** with predefined MQTT topics
 - **SquareLine Studio** ready for advanced UI design
 - **Professional code structure** for production use
 
@@ -43,13 +45,19 @@ A professional knob interface built on ESP32-C3 with 360x360 round display, feat
 2. Connect to WiFi network: `ESP32-Knob-Setup` (password: `knob123`)
 3. Browser opens automatically for configuration
 4. Select your home WiFi and enter password
-5. Device restarts and connects automatically
+5. **Configure MQTT settings** (server, port, username, password)
+6. Device restarts and connects automatically
+
+📖 **Detailed Guides:**
+- [WiFi Setup Guide](WIFI_SETUP.md) - Complete WiFi configuration instructions
+- [MQTT Setup Guide](MQTT_SETUP.md) - MQTT broker setup and integration
 
 ## 📱 Visual Feedback
 
-- **Green arc** = WiFi connected ✅
-- **Red arc** = WiFi disconnected ❌  
-- **IP address** displayed when connected
+- **🟢 Green arc** = WiFi + MQTT connected ✅  
+- **🟠 Orange arc** = WiFi connected, MQTT disconnected ⚠️
+- **🔴 Red arc** = WiFi disconnected ❌  
+- **Connection details** displayed on screen (IP, MQTT broker)
 - **Touch responsive** interface
 
 ## 🏗️ Project Structure
