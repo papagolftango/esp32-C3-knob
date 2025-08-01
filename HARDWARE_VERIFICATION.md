@@ -8,7 +8,13 @@
 - **ESP32-U4WDH**: Secondary MCU (4MB Flash)
 - **Display**: 360×360 QSPI ST77916 driver
 - **Touch**: CST816 via I2C interface
-- **Features**: Dual encoders (one per MCU), audio codec, vibration motor
+- **Features**: Dual encoders (one per MCU), audio codec, **vibration motor**
+
+## Vibration Motor (Haptic Feedback) 🎯
+- **Driver**: DRV2605 (Vibration motor driver with I2C interface)
+- **Interface**: I2C communication
+- **Capabilities**: Programmable haptic effects, variable intensity
+- **Use Cases**: Rotary encoder feedback, touch confirmations, notifications
 
 ## Verified Pin Assignments (ESP32-S3 MCU)
 
