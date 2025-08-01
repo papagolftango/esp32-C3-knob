@@ -20,6 +20,111 @@ PubSubClient mqtt(espClient);
 
 bool wifi_connected = false;
 bool mqtt_connected = false;
+bool ui_needs_update = true;
+
+// Screen Management
+enum Screen {
+    SCREEN_ENERGY = 0,
+    SCREEN_WEATHER,
+    SCREEN_HOUSE_INFO,
+    SCREEN_SETTINGS,
+    SCREEN_COUNT  // Total number of screens
+};
+
+Screen current_screen = SCREEN_ENERGY;  // Default to Energy
+const char* screen_names[] = {
+    "Energy",
+    "Weather", 
+    "House Info",
+    "Settings"
+};
+
+// Navigation state
+unsigned long last_interaction = 0;
+bool screen_changed = true;
+
+// Rotary Encoder Configuration
+// Pin assignments for ESP32-C3 (from manufacturer demo code)
+#define ENCODER_PIN_A 8   // GPIO8 - Rotary encoder A (ECA_PIN)
+#define ENCODER_PIN_B 7   // GPIO7 - Rotary encoder B (ECB_PIN)
+// No button pin - rotation only encoder
+
+// Rotary encoder variables
+volatile bool encoder_a_state = false;
+volatile bool encoder_b_state = false;
+volatile int encoder_position = 0;
+volatile bool encoder_direction = false; // false = CCW, true = CW
+volatile unsigned long last_encoder_time = 0;
+
+// Rotary Encoder Interrupt Handlers
+void IRAM_ATTR encoder_isr() {
+    unsigned long now = millis();
+    
+    // Debounce - ignore very rapid changes
+    if (now - last_encoder_time < 5) {
+        return;
+    }
+    
+    bool a_state = digitalRead(ENCODER_PIN_A);
+    bool b_state = digitalRead(ENCODER_PIN_B);
+    
+    // Determine direction based on state changes
+    if (a_state != encoder_a_state) {
+        if (a_state == b_state) {
+            encoder_position++;
+            encoder_direction = true;  // Clockwise
+        } else {
+            encoder_position--;
+            encoder_direction = false; // Counter-clockwise
+        }
+        last_encoder_time = now;
+    }
+    
+    encoder_a_state = a_state;
+    encoder_b_state = b_state;
+}
+
+// Initialize rotary encoder
+void setup_rotary_encoder() {
+    pinMode(ENCODER_PIN_A, INPUT_PULLUP);
+    pinMode(ENCODER_PIN_B, INPUT_PULLUP);
+    
+    // Read initial states
+    encoder_a_state = digitalRead(ENCODER_PIN_A);
+    encoder_b_state = digitalRead(ENCODER_PIN_B);
+    
+    // Attach interrupts to both pins for better resolution
+    attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_A), encoder_isr, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_B), encoder_isr, CHANGE);
+    
+    Serial.println("Rotary encoder initialized (rotation only) on pins A:" + String(ENCODER_PIN_A) + 
+                   " B:" + String(ENCODER_PIN_B));
+}
+
+// Handle rotary encoder navigation
+void handle_rotary_navigation() {
+    static int last_position = 0;
+    static unsigned long last_nav_time = 0;
+    unsigned long now = millis();
+    
+    // Check for position changes (with some hysteresis to avoid noise)
+    int position_change = encoder_position - last_position;
+    
+    if (abs(position_change) >= 2 && (now - last_nav_time > 150)) { // Require 2 steps and debounce
+        if (position_change > 0) {
+            // Clockwise - next screen
+            next_screen();
+            Serial.println("Rotary: Next screen (CW)");
+        } else {
+            // Counter-clockwise - previous screen
+            previous_screen();
+            Serial.println("Rotary: Previous screen (CCW)");
+        }
+        
+        last_position = encoder_position;
+        last_nav_time = now;
+    }
+}
 
 // MQTT Configuration (will be set via WiFiManager)
 String mqtt_server = "";
@@ -28,14 +133,122 @@ String mqtt_username = "";
 String mqtt_password = "";
 String mqtt_client_id = "ESP32-Knob-";
 
-// MQTT Topics to subscribe to
+// Energy monitoring data from EmonTX3
+float energy_balance = 0.0;    // Grid import/export balance
+float energy_solar = 0.0;      // Solar generation
+float energy_vrms = 0.0;       // Voltage RMS
+float energy_used = 0.0;       // Energy consumption
+String energy_tariff = "";     // Current tariff status
+
+// Daily peak tracking
+float daily_peak_export = 0.0;  // Peak export (negative balance)
+float daily_peak_import = 0.0;  // Peak import (positive balance)
+unsigned long last_peak_reset = 0;  // Timestamp of last peak reset
+const unsigned long PEAK_RESET_HOUR = 12;  // Reset at noon (12:00)
+
+// Mock Data Configuration
+#define ENABLE_MOCK_DATA true  // Set to false when using real MQTT data
+unsigned long last_mock_update = 0;
+const unsigned long MOCK_UPDATE_INTERVAL = 2000;  // Update every 2 seconds
+float mock_time_offset = 0;  // Simulated time progression
+
+// Mock data generator to simulate realistic daily energy patterns
+void update_mock_data() {
+    if (!ENABLE_MOCK_DATA) return;
+    
+    unsigned long now = millis();
+    if (now - last_mock_update < MOCK_UPDATE_INTERVAL) return;
+    
+    // Simulate time progression (24 hours in 2 minutes for demo)
+    mock_time_offset += 0.2;  // Increment time
+    if (mock_time_offset > 24.0) mock_time_offset = 0;  // Reset after 24 hours
+    
+    // Simulate solar generation (0W at night, peak around noon)
+    float solar_factor = sin((mock_time_offset - 6) * PI / 12);  // Peak at hour 12 (noon)
+    if (solar_factor < 0) solar_factor = 0;  // No negative solar
+    energy_solar = solar_factor * 4500 + random(-200, 200);  // 0-4500W with noise
+    if (energy_solar < 0) energy_solar = 0;
+    
+    // Simulate house usage (higher in morning/evening, lower at night)
+    float usage_base = 800;  // Base load
+    float usage_morning = (mock_time_offset > 6 && mock_time_offset < 10) ? 1500 : 0;
+    float usage_evening = (mock_time_offset > 17 && mock_time_offset < 22) ? 2000 : 0;
+    float usage_night = (mock_time_offset < 6 || mock_time_offset > 23) ? -400 : 0;
+    energy_used = usage_base + usage_morning + usage_evening + usage_night + random(-100, 300);
+    if (energy_used < 100) energy_used = 100;  // Minimum usage
+    
+    // Calculate balance (positive = import, negative = export)
+    energy_balance = energy_used - energy_solar + random(-100, 100);  // Add some noise
+    
+    // Simulate voltage
+    energy_vrms = 240 + random(-5, 5);
+    
+    // Simulate tariff (peak hours 16:00-20:00)
+    energy_tariff = (mock_time_offset >= 16 && mock_time_offset <= 20) ? "peak" : "standard";
+    
+    // Update peaks
+    update_daily_peaks();
+    
+    // Trigger UI update with new data
+    ui_needs_update = true;
+    
+    last_mock_update = now;
+    
+    // Debug output every 10 updates
+    static int debug_counter = 0;
+    if (++debug_counter >= 5) {
+        Serial.printf("MOCK[%.1fh]: Solar=%.0fW, Usage=%.0fW, Balance=%.0fW, Tariff=%s\n", 
+                     mock_time_offset, energy_solar, energy_used, energy_balance, energy_tariff.c_str());
+        debug_counter = 0;
+    }
+}
+
+// MQTT Topics to subscribe to (EmonTX3 + control topics)
 const char* topics[] = {
-    "home/knob/command",
-    "home/lighting/brightness",
-    "home/audio/volume",
-    "home/hvac/temperature"
+    "home/knob/command",        // Device control
+    "emon/emontx3/balance",     // Grid balance (import/export)
+    "emon/emontx3/solar",       // Solar generation
+    "emon/emontx3/vrms",        // Voltage RMS
+    "emon/emontx3/used",        // Energy consumption
+    "emon/emontx3/tariff"       // Tariff status
 };
 const int num_topics = sizeof(topics) / sizeof(topics[0]);
+
+// Function to update daily peaks and handle reset
+void update_daily_peaks() {
+    // Check if we need to reset peaks (at noon each day)
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    
+    // Simple daily reset check (could be enhanced with RTC)
+    unsigned long current_time = millis();
+    
+    // Reset peaks if it's been more than 24 hours since last reset
+    // In a real implementation, you'd use proper time/date checking
+    if (current_time - last_peak_reset > (24 * 60 * 60 * 1000)) {
+        daily_peak_export = 0.0;
+        daily_peak_import = 0.0;
+        last_peak_reset = current_time;
+        Serial.println("Daily peaks reset");
+    }
+    
+    // Update peaks based on current balance
+    if (energy_balance < 0) {
+        // Exporting - track peak export (most negative value)
+        if (energy_balance < daily_peak_export) {
+            daily_peak_export = energy_balance;
+            Serial.printf("New daily peak export: %.2f W\n", daily_peak_export);
+        }
+    } else if (energy_balance > 0) {
+        // Importing - track peak import (most positive value)
+        if (energy_balance > daily_peak_import) {
+            daily_peak_import = energy_balance;
+            Serial.printf("New daily peak import: %.2f W\n", daily_peak_import);
+        }
+    }
+}
 
 // MQTT callback function
 void mqtt_callback(char* topic, byte* payload, unsigned int length) {
@@ -54,21 +267,32 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
             wm.resetSettings();
             ESP.restart();
         }
-    } else if (String(topic) == "home/lighting/brightness") {
-        // Handle lighting brightness
-        int brightness = message.toInt();
-        Serial.printf("Setting brightness to: %d\n", brightness);
-        // TODO: Update UI to show brightness value
-    } else if (String(topic) == "home/audio/volume") {
-        // Handle audio volume
-        int volume = message.toInt();
-        Serial.printf("Setting volume to: %d\n", volume);
-        // TODO: Update UI to show volume value
-    } else if (String(topic) == "home/hvac/temperature") {
-        // Handle temperature
-        float temp = message.toFloat();
-        Serial.printf("Temperature: %.1f°C\n", temp);
-        // TODO: Update UI to show temperature
+    } else if (String(topic) == "emon/emontx3/balance") {
+        // Grid balance (positive = import, negative = export)
+        energy_balance = message.toFloat();
+        Serial.printf("Energy Balance: %.2f W\n", energy_balance);
+        update_daily_peaks();  // Update peak tracking
+        ui_needs_update = true;
+    } else if (String(topic) == "emon/emontx3/solar") {
+        // Solar generation
+        energy_solar = message.toFloat();
+        Serial.printf("Solar Generation: %.2f W\n", energy_solar);
+        ui_needs_update = true;
+    } else if (String(topic) == "emon/emontx3/vrms") {
+        // Voltage RMS
+        energy_vrms = message.toFloat();
+        Serial.printf("Voltage RMS: %.2f V\n", energy_vrms);
+        ui_needs_update = true;
+    } else if (String(topic) == "emon/emontx3/used") {
+        // Energy consumption
+        energy_used = message.toFloat();
+        Serial.printf("Energy Used: %.2f W\n", energy_used);
+        ui_needs_update = true;
+    } else if (String(topic) == "emon/emontx3/tariff") {
+        // Tariff status
+        energy_tariff = message;
+        Serial.printf("Tariff: %s\n", energy_tariff.c_str());
+        ui_needs_update = true;
     }
 }
 
@@ -234,51 +458,357 @@ void touch_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
     }
 }
 
-// Create a simple knob widget demo (TEMPORARY - will be replaced by SquareLine Studio UI)
-void create_demo_ui(void)
+// Screen creation functions
+void create_energy_screen(void)
 {
-    // Create a knob (arc widget)
+    // Create title with tariff indicator
+    lv_obj_t *title = lv_label_create(lv_scr_act());
+    String title_text = "⚡ ENERGY";
+    
+    // Add tariff indicator (like LED status)
+    if (energy_tariff.length() > 0) {
+        if (energy_tariff.toLowerCase().indexOf("low") >= 0 || 
+            energy_tariff.toLowerCase().indexOf("off") >= 0 ||
+            energy_tariff.toLowerCase().indexOf("night") >= 0) {
+            title_text += " 🟢";  // Green for low tariff
+        } else {
+            title_text += " 🔴";  // Red for high tariff  
+        }
+    }
+    
+    lv_label_set_text(title, title_text.c_str());
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_18, 0);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 20);
+    
+    // Main balance arc - large center arc
+    int arc_value = 0;
+    lv_color_t arc_color;
+    float max_scale_export = 4000.0;  // 4kW export max
+    float max_scale_import = 8000.0;  // 8kW import max
+    
+    if (energy_balance < 0) {
+        // Exporting (excess solar) - scale to 4000W max
+        float abs_balance = abs(energy_balance);
+        arc_value = (int)((abs_balance / max_scale_export) * 100);
+        if (arc_value > 100) arc_value = 100;
+        
+        // Color based on solar generation
+        if (energy_solar > 1500) {
+            arc_color = lv_palette_main(LV_PALETTE_GREEN);  // Good solar
+        } else {
+            arc_color = lv_palette_main(LV_PALETTE_ORANGE); // Low solar
+        }
+    } else if (energy_balance > 0) {
+        // Importing - scale to 8000W max
+        arc_value = (int)((energy_balance / max_scale_import) * 100);
+        if (arc_value > 100) arc_value = 100;
+        arc_color = lv_palette_main(LV_PALETTE_RED);        // Importing
+    } else {
+        // Balanced
+        arc_value = 0;
+        arc_color = lv_palette_main(LV_PALETTE_GREY);       // Neutral
+    }
+    
+    // Create main balance arc
+    lv_obj_t *balance_arc = lv_arc_create(lv_scr_act());
+    lv_obj_set_size(balance_arc, 200, 200);
+    lv_obj_center(balance_arc);
+    lv_arc_set_rotation(balance_arc, 270);
+    lv_arc_set_bg_angles(balance_arc, 0, 360);
+    lv_arc_set_value(balance_arc, arc_value);
+    lv_obj_remove_style(balance_arc, NULL, LV_PART_KNOB);
+    lv_obj_set_style_arc_color(balance_arc, arc_color, LV_PART_INDICATOR);
+    
+    // Add peak dots on the balance arc
+    // Calculate peak positions as angles (0-360 degrees)
+    if (daily_peak_export < 0) {
+        // Export peak dot (green)
+        float export_angle = (abs(daily_peak_export) / max_scale_export) * 360;
+        if (export_angle > 360) export_angle = 360;
+        
+        lv_obj_t *export_dot = lv_obj_create(lv_scr_act());
+        lv_obj_set_size(export_dot, 8, 8);
+        lv_obj_set_style_bg_color(export_dot, lv_palette_main(LV_PALETTE_GREEN), 0);
+        lv_obj_set_style_border_width(export_dot, 2, 0);
+        lv_obj_set_style_border_color(export_dot, lv_color_white(), 0);
+        lv_obj_set_style_radius(export_dot, LV_RADIUS_CIRCLE, 0);
+        
+        // Position dot on arc circumference
+        float rad = (export_angle - 90) * M_PI / 180.0;  // Convert to radians, offset by 90°
+        int dot_x = 180 + (int)(90 * cos(rad));  // 90 = arc radius - dot radius
+        int dot_y = 180 + (int)(90 * sin(rad));
+        lv_obj_set_pos(export_dot, dot_x - 4, dot_y - 4);  // Center the dot
+    }
+    
+    if (daily_peak_import > 0) {
+        // Import peak dot (red)
+        float import_angle = (daily_peak_import / max_scale_import) * 360;
+        if (import_angle > 360) import_angle = 360;
+        
+        lv_obj_t *import_dot = lv_obj_create(lv_scr_act());
+        lv_obj_set_size(import_dot, 8, 8);
+        lv_obj_set_style_bg_color(import_dot, lv_palette_main(LV_PALETTE_RED), 0);
+        lv_obj_set_style_border_width(import_dot, 2, 0);
+        lv_obj_set_style_border_color(import_dot, lv_color_white(), 0);
+        lv_obj_set_style_radius(import_dot, LV_RADIUS_CIRCLE, 0);
+        
+        // Position dot on arc circumference
+        float rad = (import_angle - 90) * M_PI / 180.0;  // Convert to radians, offset by 90°
+        int dot_x = 180 + (int)(90 * cos(rad));  // 90 = arc radius - dot radius
+        int dot_y = 180 + (int)(90 * sin(rad));
+        lv_obj_set_pos(import_dot, dot_x - 4, dot_y - 4);  // Center the dot
+    }
+    
+    // Main balance display (center of main arc)
+    lv_obj_t *balance_label = lv_label_create(lv_scr_act());
+    String balance_text = "";
+    
+    if (energy_balance < 0) {
+        balance_text = "EXPORT\n" + String(abs(energy_balance), 0) + "W";
+    } else if (energy_balance > 0) {
+        balance_text = "IMPORT\n" + String(energy_balance, 0) + "W";
+    } else {
+        balance_text = "BALANCED\n0W";
+    }
+    
+    lv_label_set_text(balance_label, balance_text.c_str());
+    lv_obj_set_style_text_font(balance_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_align(balance_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_center(balance_label);
+    
+    // Left mini arc - Solar Generation (0-5000W scale)
+    if (energy_solar > 0) {
+        lv_obj_t *solar_arc = lv_arc_create(lv_scr_act());
+        lv_obj_set_size(solar_arc, 60, 60);
+        lv_obj_align(solar_arc, LV_ALIGN_LEFT_MID, 20, 0);
+        lv_arc_set_rotation(solar_arc, 270);
+        lv_arc_set_bg_angles(solar_arc, 0, 180);  // Half circle
+        int solar_value = (int)((energy_solar / 5000.0) * 100);
+        if (solar_value > 100) solar_value = 100;
+        lv_arc_set_value(solar_arc, solar_value);
+        lv_obj_remove_style(solar_arc, NULL, LV_PART_KNOB);
+        lv_obj_set_style_arc_color(solar_arc, lv_palette_main(LV_PALETTE_YELLOW), LV_PART_INDICATOR);
+        
+        // Solar label
+        lv_obj_t *solar_label = lv_label_create(lv_scr_act());
+        String solar_text = "☀️\n" + String(energy_solar, 0);
+        lv_label_set_text(solar_label, solar_text.c_str());
+        lv_obj_set_style_text_font(solar_label, &lv_font_montserrat_10, 0);
+        lv_obj_set_style_text_align(solar_label, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align_to(solar_label, solar_arc, LV_ALIGN_CENTER, 0, 0);
+    }
+    
+    // Right mini arc - House Usage (0-8000W scale)
+    if (energy_used > 0) {
+        lv_obj_t *usage_arc = lv_arc_create(lv_scr_act());
+        lv_obj_set_size(usage_arc, 60, 60);
+        lv_obj_align(usage_arc, LV_ALIGN_RIGHT_MID, -20, 0);
+        lv_arc_set_rotation(usage_arc, 270);
+        lv_arc_set_bg_angles(usage_arc, 0, 180);  // Half circle
+        int usage_value = (int)((energy_used / 8000.0) * 100);
+        if (usage_value > 100) usage_value = 100;
+        lv_arc_set_value(usage_arc, usage_value);
+        lv_obj_remove_style(usage_arc, NULL, LV_PART_KNOB);
+        lv_obj_set_style_arc_color(usage_arc, lv_palette_main(LV_PALETTE_BLUE), LV_PART_INDICATOR);
+        
+        // Usage label
+        lv_obj_t *usage_label = lv_label_create(lv_scr_act());
+        String usage_text = "🏠\n" + String(energy_used, 0);
+        lv_label_set_text(usage_label, usage_text.c_str());
+        lv_obj_set_style_text_font(usage_label, &lv_font_montserrat_10, 0);
+        lv_obj_set_style_text_align(usage_label, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align_to(usage_label, usage_arc, LV_ALIGN_CENTER, 0, 0);
+    }
+    
+    // Small voltage display and connection status (bottom center)
+    lv_obj_t *status = lv_label_create(lv_scr_act());
+    String status_text = "";
+    if (mqtt_connected) {
+        status_text = "📡 EmonTX3";
+        if (energy_vrms > 0) {
+            status_text += " | " + String(energy_vrms, 0) + "V";
+        }
+    } else {
+        status_text = "📡 Offline";
+    }
+    lv_label_set_text(status, status_text.c_str());
+    lv_obj_set_style_text_font(status, &lv_font_montserrat_10, 0);
+    lv_obj_align(status, LV_ALIGN_BOTTOM_MID, 0, -10);
+}
+
+void create_weather_screen(void)
+{
+    // Create title
+    lv_obj_t *title = lv_label_create(lv_scr_act());
+    lv_label_set_text(title, "🌤️ WEATHER");
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_18, 0);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 20);
+    
+    // Temperature arc
     lv_obj_t *arc = lv_arc_create(lv_scr_act());
-    lv_obj_set_size(arc, 200, 200);  // Larger for 360x360 screen
+    lv_obj_set_size(arc, 180, 180);
     lv_obj_center(arc);
     lv_arc_set_rotation(arc, 270);
     lv_arc_set_bg_angles(arc, 0, 360);
-    lv_obj_remove_style(arc, NULL, LV_PART_KNOB);   // Remove the knob of the arc
+    lv_arc_set_value(arc, 72);  // Example: 72% of temp range
+    lv_obj_remove_style(arc, NULL, LV_PART_KNOB);
     
-    // Create a label to show the status
-    lv_obj_t *label = lv_label_create(lv_scr_act());
-    String status_text = "ESP32 Knob\n\nWiFi: ";
-    status_text += wifi_connected ? "Connected" : "Disconnected";
-    status_text += "\nMQTT: ";
-    status_text += mqtt_connected ? "Connected" : "Disconnected";
+    // Weather info
+    lv_obj_t *weather_label = lv_label_create(lv_scr_act());
+    lv_label_set_text(weather_label, "22°C\nPartly Cloudy\n45% Humidity");
+    lv_obj_set_style_text_font(weather_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_align(weather_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_center(weather_label);
     
+    // Data source
+    lv_obj_t *source = lv_label_create(lv_scr_act());
+    String source_text = mqtt_connected ? "📡 Live Weather" : "📡 Offline";
+    lv_label_set_text(source, source_text.c_str());
+    lv_obj_align(source, LV_ALIGN_BOTTOM_MID, 0, -10);
+    
+    // Arc color for temperature
+    lv_color_t arc_color = lv_palette_main(LV_PALETTE_ORANGE);
+    lv_obj_set_style_arc_color(arc, arc_color, LV_PART_INDICATOR);
+}
+
+void create_house_info_screen(void)
+{
+    // Create title
+    lv_obj_t *title = lv_label_create(lv_scr_act());
+    lv_label_set_text(title, "🏠 HOUSE INFO");
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_18, 0);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 20);
+    
+    // Connection status arc
+    lv_obj_t *arc = lv_arc_create(lv_scr_act());
+    lv_obj_set_size(arc, 180, 180);
+    lv_obj_center(arc);
+    lv_arc_set_rotation(arc, 270);
+    lv_arc_set_bg_angles(arc, 0, 360);
+    int connection_pct = (wifi_connected ? 50 : 0) + (mqtt_connected ? 50 : 0);
+    lv_arc_set_value(arc, connection_pct);
+    lv_obj_remove_style(arc, NULL, LV_PART_KNOB);
+    
+    // House systems info
+    lv_obj_t *info_label = lv_label_create(lv_scr_act());
+    String info_text = "WiFi: ";
+    info_text += wifi_connected ? "✅" : "❌";
+    info_text += "\nMQTT: ";
+    info_text += mqtt_connected ? "✅" : "❌";
     if (wifi_connected) {
-        status_text += "\nIP: " + WiFi.localIP().toString();
+        info_text += "\nIP: " + WiFi.localIP().toString();
     }
-    if (mqtt_connected && mqtt_server.length() > 0) {
-        status_text += "\nBroker: " + mqtt_server;
-    }
+    lv_label_set_text(info_label, info_text.c_str());
+    lv_obj_set_style_text_font(info_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_align(info_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_center(info_label);
     
-    lv_label_set_text(label, status_text.c_str());
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_center(label);
+    // Device info
+    lv_obj_t *device = lv_label_create(lv_scr_act());
+    lv_label_set_text(device, "ESP32-C3 Knob");
+    lv_obj_align(device, LV_ALIGN_BOTTOM_MID, 0, -10);
     
-    // Style the arc based on connection status
-    lv_obj_set_style_arc_width(arc, 12, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(arc, 12, LV_PART_INDICATOR);
-    
+    // Arc color based on connection
     lv_color_t arc_color;
     if (wifi_connected && mqtt_connected) {
-        arc_color = lv_palette_main(LV_PALETTE_GREEN);  // Both connected
+        arc_color = lv_palette_main(LV_PALETTE_GREEN);
     } else if (wifi_connected) {
-        arc_color = lv_palette_main(LV_PALETTE_ORANGE); // WiFi only
+        arc_color = lv_palette_main(LV_PALETTE_ORANGE);
     } else {
-        arc_color = lv_palette_main(LV_PALETTE_RED);    // No connection
+        arc_color = lv_palette_main(LV_PALETTE_RED);
     }
     lv_obj_set_style_arc_color(arc, arc_color, LV_PART_INDICATOR);
+}
+
+void create_settings_screen(void)
+{
+    // Create title
+    lv_obj_t *title = lv_label_create(lv_scr_act());
+    lv_label_set_text(title, "⚙️ SETTINGS");
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_18, 0);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 20);
     
-    // This temporary UI will be replaced by SquareLine Studio generated code
+    // Settings menu with mock mode status
+    lv_obj_t *menu_label = lv_label_create(lv_scr_act());
+    String settings_text = "• Brightness: 80%\n";
+    settings_text += "• Mock Data: ";
+    settings_text += ENABLE_MOCK_DATA ? "ON 🟢" : "OFF 🔴";
+    settings_text += "\n• Reset WiFi\n• Factory Reset\n• Display Info";
+    
+    lv_label_set_text(menu_label, settings_text.c_str());
+    lv_obj_set_style_text_font(menu_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_align(menu_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_center(menu_label);
+    
+    // Instructions
+    lv_obj_t *instructions = lv_label_create(lv_scr_act());
+    String inst_text = "Touch to interact";
+    if (ENABLE_MOCK_DATA) {
+        inst_text += "\n\n🎯 DEMO MODE ACTIVE\nSimulating EmonTX3 data";
+    }
+    lv_label_set_text(instructions, inst_text.c_str());
+    lv_obj_align(instructions, LV_ALIGN_BOTTOM_MID, 0, -10);
+}
+
+// Navigation functions
+void switch_to_screen(Screen new_screen)
+{
+    if (new_screen != current_screen) {
+        current_screen = new_screen;
+        screen_changed = true;
+        ui_needs_update = true;
+        last_interaction = millis();
+        
+        Serial.printf("Switched to screen: %s\n", screen_names[current_screen]);
+    }
+}
+
+void next_screen()
+{
+    Screen next = (Screen)((current_screen + 1) % SCREEN_COUNT);
+    switch_to_screen(next);
+}
+
+void previous_screen()
+{
+    Screen prev = (Screen)((current_screen - 1 + SCREEN_COUNT) % SCREEN_COUNT);
+    switch_to_screen(prev);
+}
+
+// Update current screen
+void update_current_screen(void)
+{
+    // Clear screen
+    lv_obj_clean(lv_scr_act());
+    
+    // Create the appropriate screen
+    switch (current_screen) {
+        case SCREEN_ENERGY:
+            create_energy_screen();
+            break;
+        case SCREEN_WEATHER:
+            create_weather_screen();
+            break;
+        case SCREEN_HOUSE_INFO:
+            create_house_info_screen();
+            break;
+        case SCREEN_SETTINGS:
+            create_settings_screen();
+            break;
+    }
+    
+    // Add screen indicator at top
+    lv_obj_t *indicator = lv_label_create(lv_scr_act());
+    String indicator_text = String(current_screen + 1) + "/" + String(SCREEN_COUNT) + " - Rotate to change";
+    lv_label_set_text(indicator, indicator_text.c_str());
+    lv_obj_set_style_text_font(indicator, &lv_font_montserrat_10, 0);
+    lv_obj_align(indicator, LV_ALIGN_TOP_MID, 0, 5);
+}
+
+// Legacy function - now calls update_current_screen
+void create_demo_ui(void)
+{
+    update_current_screen();
 }
 
 void setup()
@@ -320,6 +850,9 @@ void setup()
     indev_drv.read_cb = touch_read;
     lv_indev_drv_register(&indev_drv);
 
+    // Initialize rotary encoder
+    setup_rotary_encoder();
+
     // Create the demo UI (will be replaced by SquareLine Studio)
     create_demo_ui();
     
@@ -331,11 +864,41 @@ void setup()
 
 void loop()
 {
+    // Update mock data for testing (disable when using real MQTT)
+    update_mock_data();
+    
     // Handle LVGL tasks
     lv_timer_handler();
     
     // Handle WiFiManager portal
     wifiManager.process();
+    
+    // Handle rotary encoder navigation
+    handle_rotary_navigation();
+    
+    // Touch screen navigation (primary button replacement)
+    // Touch screen to enter/confirm actions
+    static bool touch_was_pressed = false;
+    static unsigned long last_touch_time = 0;
+    
+    // Check for touch events
+    lv_indev_t * indev = lv_indev_get_next(NULL);
+    if (indev != NULL) {
+        lv_indev_data_t data;
+        lv_indev_read(indev, &data);
+        
+        bool touch_pressed = (data.state == LV_INDEV_STATE_PR);
+        unsigned long now = millis();
+        
+        // Touch acts as "button press" - could be used for settings or actions
+        if (touch_pressed && !touch_was_pressed && (now - last_touch_time > 400)) {
+            Serial.println("Touch press - could trigger screen action");
+            // For now, just advance screen (could be changed to screen-specific actions)
+            next_screen();
+            last_touch_time = now;
+        }
+        touch_was_pressed = touch_pressed;
+    }
     
     // Update WiFi connection status
     bool current_wifi_status = WiFi.status() == WL_CONNECTED;
@@ -351,8 +914,8 @@ void loop()
         }
     }
     
-    // Handle MQTT connection if WiFi is connected
-    if (wifi_connected) {
+    // Handle MQTT connection if WiFi is connected (skip in mock mode)
+    if (wifi_connected && !ENABLE_MOCK_DATA) {
         // Check if MQTT client is connected
         bool current_mqtt_status = mqtt.connected();
         if (current_mqtt_status != mqtt_connected) {
@@ -366,16 +929,24 @@ void loop()
             connect_mqtt();
         }
         
-        // Process MQTT messages
-        mqtt.loop();
+        // Process MQTT messages (skip in mock mode)
+        if (!ENABLE_MOCK_DATA) {
+            mqtt.loop();
+        }
+    } else if (ENABLE_MOCK_DATA) {
+        // In mock mode, simulate connected status for UI
+        if (!mqtt_connected) {
+            mqtt_connected = true;
+            ui_needs_update = true;
+            Serial.println("MOCK: Simulating MQTT connected");
+        }
     }
     
-    // Update UI if needed
-    if (ui_needs_update) {
+    // Update UI if needed (screen changed or connection status changed)
+    if (ui_needs_update || screen_changed) {
         ui_needs_update = false;
-        // Clear screen and recreate UI with updated status
-        lv_obj_clean(lv_scr_act());
-        create_demo_ui();
+        screen_changed = false;
+        update_current_screen();
     }
     
     delay(10);  // Small delay to prevent watchdog issues
