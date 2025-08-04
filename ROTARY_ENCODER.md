@@ -2,13 +2,13 @@
 
 ## Pin Configuration
 
-The ESP32-C3 Knob now supports rotary encoder navigation with the following pin assignments:
+The ESP32-S3 Knob supports rotary encoder navigation with the following pin assignments:
 
 | Pin | Function | GPIO |
 |-----|----------|------|
 | ENCODER_PIN_A | Rotary A signal | GPIO8 |
-| ENCODER_PIN_B | Rotary B signal | GPIO9 |
-| ENCODER_BTN | Encoder button | GPIO4 |
+| ENCODER_PIN_B | Rotary B signal | GPIO7 |
+| ENCODER_BTN | Encoder button | GPIO (TBD) |
 
 ## Navigation Controls
 

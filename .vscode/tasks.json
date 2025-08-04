@@ -13,6 +13,74 @@
 			"problemMatcher": [
 				"$platformio"
 			]
+		},
+		{
+			"label": "ESP-IDF: Build",
+			"type": "shell",
+			"command": "idf.py",
+			"args": ["build"],
+			"group": "build",
+			"isBackground": false,
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "ESP-IDF: Flash",
+			"type": "shell",
+			"command": "idf.py",
+			"args": ["flash"],
+			"group": "build",
+			"isBackground": false,
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "ESP-IDF: Flash and Monitor",
+			"type": "shell",
+			"command": "idf.py",
+			"args": ["flash", "monitor"],
+			"group": "build",
+			"isBackground": true,
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "ESP-IDF: Monitor",
+			"type": "shell",
+			"command": "idf.py",
+			"args": ["monitor"],
+			"group": "build",
+			"isBackground": true,
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false
+			},
+			"problemMatcher": []
 		}
 	]
 }

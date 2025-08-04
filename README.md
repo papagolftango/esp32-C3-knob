@@ -1,43 +1,59 @@
-# ESP32-C3 Knob Display
+# ESP32-S3 Knob Touch LCD
 
-A professional knob interface built on ESP32-C3 with 360x360 round display, featuring LVGL graphics, WiFiManager, and SquareLine Studio support.
+A professional knob interface built on ESP32-S3-Knob-Touch-LCD-1.8 with 360x360 round display, featuring LVGL graphics, WiFi connectivity, and EmonTX3 energy monitoring integration.
 
-![ESP32-C3 Knob](https://img.shields.io/badge/Platform-ESP32--C3-blue)
-![LVGL](https://img.shields.io/badge/Graphics-LVGL%208.3.0-green)
-![WiFi](https://img.shields.io/badge/WiFi-Manager-orange)
-![Display](https://img.shields.io/badge/Display-360x360-purple)
+![ESP32-S3](https://img.shields.io/badge/Platform-ESP32--S3-blue)
+![ESP-IDF](https://img.shields.io/badge/Framework-ESP--IDF%20v5.5-green)
+![LVGL](https://img.shields.io/badge/Graphics-LVGL%208.3.0-purple)
+![Display](https://img.shields.io/badge/Display-360x360%20ST77916-orange)
 
 ## 🎛️ Features
 
-- **ESP32-C3** microcontroller with WiFi/Bluetooth
-- **360x360 round display** with ST7789 driver
-- **Capacitive touch screen** support
-- **LVGL 8.3.0** graphics library integration
+- **ESP32-S3 dual MCU** (ESP32-S3R8 + ESP32-U4WDH) with WiFi/Bluetooth
+- **360x360 round display** with ST77916 driver and capacitive touch
+- **DRV2605 haptic feedback** for tactile interactions
+- **Rotary encoder** for precise navigation (GPIO7/8)
+- **LVGL 8.3.0** graphics with multi-screen UI system
+- **EmonTX3 integration** for real-time energy monitoring
 - **WiFiManager** for secure credential storage (no hardcoded passwords)
-- **MQTT integration** with secure broker authentication
-- **Home automation ready** with predefined MQTT topics
-- **SquareLine Studio** ready for advanced UI design
-- **Professional code structure** for production use
+- **MQTT client** with auto-reconnection and topic routing
+- **Peak tracking** with daily reset functionality
+- **Mock mode** for development without EmonTX3 hardware
+- **Professional architecture** with feature-based component structure
 
 ## 🚀 Quick Start
 
 ### Hardware Requirements
-- Waveshare ESP32-C3 1.8" knob display (360x360)
-- USB-C cable for programming
-- Computer with PlatformIO installed
+- **ESP32-S3-Knob-Touch-LCD-1.8** development board
+- **USB-C cable** for programming and power
+- **Computer** with ESP-IDF v5.5 installed
 
 ### Software Setup
 1. **Clone this repository:**
    ```bash
-   git clone https://github.com/yourusername/ESP32-C3-Knob.git
+   git clone https://github.com/papagolftango/ESP32-C3-Knob.git
    cd ESP32-C3-Knob
    ```
 
-2. **Open in VS Code with PlatformIO extension**
-
-3. **Build and upload:**
+2. **Set up ESP-IDF environment:**
    ```bash
-   pio run --target upload --target monitor
+   # Windows PowerShell
+   & "C:\Espressif\frameworks\esp-idf-v5.5\export.ps1"
+   
+   # Or use ESP-IDF PowerShell shortcut from Start Menu
+   ```
+
+3. **Build and flash:**
+   ```bash
+   idf.py set-target esp32s3
+   idf.py build
+   idf.py flash monitor
+   ```
+
+### VS Code Integration
+- Install **ESP-IDF extension** for VS Code
+- Use **Command Palette** (`Ctrl+Shift+P`) → "ESP-IDF: Flash"
+- Or run **VS Code tasks**: "ESP-IDF: Flash and Monitor"
    ```
 
 ### WiFi Configuration
