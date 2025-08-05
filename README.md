@@ -79,13 +79,17 @@ A professional knob interface built on ESP32-S3-Knob-Touch-LCD-1.8 with 360x360 
 ## 🏗️ Project Structure
 
 ```
-ESP32-C3-Knob/
-├── src/
-│   └── main.cpp              # Main application code
+ESP32-S3-Knob/
+├── main/
+│   ├── main.cpp              # Main application code
+│   ├── features/             # Feature modules
+│   └── core/                 # Hardware abstraction
+├── components/               # ESP-IDF components
 ├── include/
-│   ├── lv_conf.h            # LVGL configuration
-│   └── User_Setup.h         # TFT_eSPI display config
-├── platformio.ini           # Build configuration
+│   └── lv_conf.h            # LVGL configuration
+├── CMakeLists.txt           # ESP-IDF build configuration
+├── idf_component.yml        # Component dependencies
+├── sdkconfig                # ESP-IDF configuration
 ├── .gitignore              # Git ignore rules
 ├── WIFI_SETUP.md           # WiFi setup guide
 ├── SQUARELINE_INTEGRATION.md # SquareLine Studio guide
@@ -143,21 +147,21 @@ See [WIFI_SETUP.md](WIFI_SETUP.md) for advanced configuration.
 
 ## 📚 Dependencies
 
-All dependencies are automatically managed by PlatformIO:
+All dependencies are automatically managed by ESP-IDF Component Manager:
 
-- `bodmer/TFT_eSPI@^2.5.0` - Display driver
+- `espressif/esp_lvgl_port` - LVGL integration for ESP-IDF
 - `lvgl/lvgl@^8.3.0` - Graphics library  
-- `tzapu/WiFiManager@^0.16.0` - WiFi configuration
-- `Wire` - I2C communication
+- ESP-IDF WiFi Manager - WiFi configuration
+- ESP-IDF built-in components
 
 ## 🛠️ Development
 
 ### Building
 ```bash
-pio run                    # Build project
-pio run -t upload          # Upload to device
-pio run -t monitor         # Open serial monitor
-pio run -t uploadfs        # Upload filesystem (if used)
+idf.py build                # Build project
+idf.py flash                # Upload to device
+idf.py monitor              # Open serial monitor
+idf.py flash monitor        # Upload and monitor
 ```
 
 ### Debugging
@@ -194,9 +198,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - [LVGL](https://lvgl.io/) - Amazing graphics library
-- [TFT_eSPI](https://github.com/Bodmer/TFT_eSPI) - Display driver
-- [WiFiManager](https://github.com/tzapu/WiFiManager) - WiFi configuration
-- [PlatformIO](https://platformio.org/) - Development platform
+- [ESP-IDF](https://idf.espressif.com/) - Official ESP32 development framework
+- [Espressif](https://www.espressif.com/) - ESP32 hardware and software
 - [SquareLine Studio](https://squareline.io/) - UI design tool
 
 ## 📞 Support

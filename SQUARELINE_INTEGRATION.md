@@ -25,14 +25,14 @@ When creating your SquareLine Studio project, use these settings:
 
 ### Project Settings
 - **Project Name**: ESPKnob
-- **Export Path**: `src/ui/` (create this folder)
+- **Export Path**: `main/ui/` (create this folder)
 - **UI Files**: Generate separate files for each screen
 
 ## Integration Steps
 
 ### 1. Export from SquareLine Studio
 - Design your UI in SquareLine Studio
-- Export project to `src/ui/` folder
+- Export project to `main/ui/` folder
 - This will generate:
   - `ui.h` - Main UI header
   - `ui.c` - UI implementation
@@ -51,9 +51,13 @@ ui_init();
 ```
 
 ### 3. Add UI folder to build
-Add to `platformio.ini`:
-```ini
-build_src_filter = +<*> +<ui/*>
+Add to main `CMakeLists.txt`:
+```cmake
+# Add UI component
+set(COMPONENT_SRCS "main.cpp")
+set(COMPONENT_ADD_INCLUDEDIRS "." "ui")
+file(GLOB_RECURSE UI_SOURCES "ui/*.c")
+list(APPEND COMPONENT_SRCS ${UI_SOURCES})
 ```
 
 ### 4. Handle Events
@@ -61,7 +65,7 @@ Implement your custom event handlers in the generated `ui_events.c` file or crea
 
 ## File Structure After Integration
 ```
-src/
+main/
 ├── main.cpp              # Hardware setup & main loop
 ├── ui/
 │   ├── ui.h              # Generated UI header
@@ -86,7 +90,7 @@ src/
 ### Custom Fonts
 - If using custom fonts in SquareLine Studio:
   1. Export fonts from SquareLine Studio
-  2. Add font files to `src/ui/fonts/`
+  2. Add font files to `main/ui/fonts/`
   3. Include font headers in your project
 
 ### Performance Tips
