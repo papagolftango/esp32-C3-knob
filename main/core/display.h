@@ -26,6 +26,10 @@ void display_start_task(void);
  */
 void display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
 
+// TODO: Add touch support when hardware arrives
+// void touch_init(void);
+// void touch_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
+
 #ifdef __cplusplus
 }
 #endif
