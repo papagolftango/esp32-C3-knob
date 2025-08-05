@@ -2,24 +2,14 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "PlatformIO Build",
-			"type": "shell",
-			"command": "C:\\Users\\paul.tindall\\.platformio\\penv\\Scripts\\platformio.exe",
-			"args": [
-				"run"
-			],
-			"group": "build",
-			"isBackground": false,
-			"problemMatcher": [
-				"$platformio"
-			]
-		},
-		{
 			"label": "ESP-IDF: Build",
 			"type": "shell",
 			"command": "idf.py",
 			"args": ["build"],
-			"group": "build",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
 			"isBackground": false,
 			"presentation": {
 				"echo": true,
@@ -81,6 +71,19 @@
 				"clear": false
 			},
 			"problemMatcher": []
+		},
+		{
+			"label": "PlatformIO Build",
+			"type": "shell",
+			"command": "C:\\Users\\paul.tindall\\.platformio\\penv\\Scripts\\platformio.exe",
+			"args": [
+				"run"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": [
+				"$platformio"
+			]
 		}
 	]
 }

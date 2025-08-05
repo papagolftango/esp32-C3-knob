@@ -13,7 +13,17 @@
 // LVGL includes
 #include "lvgl.h"
 
+// Project includes
+#include "wifi_manager.h"
+
 static const char *TAG = "ESP32_KNOB";
+
+// Global instances
+static WiFiManager wifiManager;
+
+// WiFi status for UI
+static bool wifi_connected = false;
+static bool wifi_provisioning = false;
 
 // Hardware configuration for ESP32-S3-Knob-Touch-LCD-1.8
 #define ENCODER_A_PIN   GPIO_NUM_8
@@ -48,6 +58,26 @@ void init_lvgl(void);
 void create_ui(void);
 static void lvgl_task(void *pvParameters);
 
+// WiFi callback functions
+void wifi_connected_callback(void) {
+    ESP_LOGI(TAG, "WiFi connected successfully");
+    wifi_connected = true;
+    wifi_provisioning = false;
+    // Update UI to show WiFi connected status
+}
+
+void wifi_disconnected_callback(void) {
+    ESP_LOGI(TAG, "WiFi disconnected");
+    wifi_connected = false;
+    // Update UI to show WiFi disconnected status
+}
+
+void provisioning_complete_callback(void) {
+    ESP_LOGI(TAG, "WiFi provisioning completed");
+    wifi_provisioning = false;
+    // Update UI to show provisioning complete
+}
+
 // LVGL display flush callback
 void display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p) {
     // TODO: Implement ST77916 display driver
@@ -71,13 +101,30 @@ extern "C" void app_main(void) {
     init_display();
     init_lvgl();
     
+    // Initialize WiFi Manager
+    ESP_LOGI(TAG, "Initializing WiFi Manager");
+    wifiManager.setCallbacks(wifi_connected_callback, 
+                            wifi_disconnected_callback, 
+                            provisioning_complete_callback);
+    ESP_ERROR_CHECK(wifiManager.initialize());
+    
+    // Start WiFi provisioning or connection
+    if (wifiManager.isProvisioned()) {
+        ESP_LOGI(TAG, "Device is provisioned, connecting to WiFi");
+        wifiManager.startProvisioning(); // This will connect to saved network
+    } else {
+        ESP_LOGI(TAG, "Device not provisioned, starting provisioning");
+        wifi_provisioning = true;
+        wifiManager.startProvisioning(); // This will start BLE provisioning
+    }
+    
     // Create UI
     create_ui();
     
     // Start LVGL task
     xTaskCreate(lvgl_task, "lvgl_task", 8192, NULL, 5, NULL);
     
-    ESP_LOGI(TAG, "Setup complete - ESP-IDF with LVGL running!");
+    ESP_LOGI(TAG, "Setup complete - ESP-IDF with LVGL and WiFi running!");
 }
 
 void init_hardware(void) {
@@ -144,18 +191,33 @@ void init_lvgl(void) {
 }
 
 void create_ui(void) {
-    ESP_LOGI(TAG, "Creating UI with available fonts");
+    ESP_LOGI(TAG, "Creating UI with WiFi status");
     
-    // Create a simple label to test fonts
+    // Create main label
     lv_obj_t *label = lv_label_create(lv_scr_act());
-    lv_label_set_text(label, "ESP32-S3 Knob\nESP-IDF + LVGL");
+    lv_label_set_text(label, "ESP32-S3 Knob\nESP-IDF + LVGL\n+ WiFiManager");
     lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0);
-    lv_obj_center(label);
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, -60);
+    
+    // Create WiFi status label
+    lv_obj_t *wifi_label = lv_label_create(lv_scr_act());
+    if (wifi_provisioning) {
+        lv_label_set_text(wifi_label, "WiFi: Provisioning...\nUse ESP WiFi Prov app");
+        lv_obj_set_style_text_color(wifi_label, lv_color_hex(0xFFA500), 0); // Orange
+    } else if (wifi_connected) {
+        lv_label_set_text(wifi_label, "WiFi: Connected");
+        lv_obj_set_style_text_color(wifi_label, lv_color_hex(0x00FF00), 0); // Green
+    } else {
+        lv_label_set_text(wifi_label, "WiFi: Disconnected");
+        lv_obj_set_style_text_color(wifi_label, lv_color_hex(0xFF0000), 0); // Red
+    }
+    lv_obj_set_style_text_font(wifi_label, &lv_font_montserrat_18, 0);
+    lv_obj_align(wifi_label, LV_ALIGN_CENTER, 0, 0);
     
     // Create an arc widget
     lv_obj_t *arc = lv_arc_create(lv_scr_act());
-    lv_obj_set_size(arc, 200, 200);
-    lv_obj_center(arc);
+    lv_obj_set_size(arc, 150, 150);
+    lv_obj_align(arc, LV_ALIGN_CENTER, 0, 60);
     lv_arc_set_value(arc, 50);
     
     ESP_LOGI(TAG, "UI created successfully");
