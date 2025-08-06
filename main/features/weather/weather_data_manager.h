@@ -4,7 +4,7 @@
 
 class WeatherDataManager {
 public:
-    static void init();
+    static void begin();
     
     // Temperature methods
     static void updateTemperature(float temp_celsius);

@@ -30,6 +30,11 @@ typedef struct {
 void app_state_manager_begin(void);
 
 /**
+ * @brief Initialize all feature managers (data managers)
+ */
+void app_state_init_feature_managers(void);
+
+/**
  * @brief Process state management tasks (call in main loop)
  */
 void app_state_manager_process(void);

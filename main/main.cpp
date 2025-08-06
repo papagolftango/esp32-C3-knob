@@ -12,17 +12,13 @@
 #include "core/rotary.h"
 #include "core/mqtt_manager.h"
 #include "core/app_state_manager.h"
+#include "core/factory_reset_manager.h"
 
 // UI management
 #include "ui/screen_manager.h"
 
 // Feature screens
 #include "features/hello_world/hello_screen.h"
-
-// MQTT integration
-#include "features/energy/energy_data_manager.h"
-#include "features/device_control/device_control_manager.h"
-#include "features/house/bin_collection_manager.h"
 
 static const char *TAG = "ESP32_KNOB";
 
@@ -55,12 +51,14 @@ extern "C" void app_main(void) {
     // Start LVGL task
     display_start_task();
     
-    // Initialize MQTT system
+    // Initialize MQTT system and feature managers
     ESP_LOGI(TAG, "Initializing MQTT system...");
     MQTTManager::begin();
-    EnergyDataManager::begin();
-    DeviceControlManager::begin();
-    BinCollectionManager::begin();
+    app_state_init_feature_managers();
+    
+    // Initialize Factory Reset Manager
+    ESP_LOGI(TAG, "Initializing Factory Reset Manager...");
+    FactoryResetManager::begin();
     
     // Initialize Application State Manager
     ESP_LOGI(TAG, "Initializing Application State Manager...");

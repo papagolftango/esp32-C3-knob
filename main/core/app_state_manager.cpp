@@ -2,6 +2,10 @@
 #include "mqtt_manager.h"
 #include "../features/hello_world/hello_screen.h"
 #include "../features/device_control/device_control_manager.h"
+#include "../features/energy/energy_data_manager.h"
+#include "../features/house/bin_collection_manager.h"
+#include "../features/house/motd_manager.h"
+#include "../features/weather/weather_data_manager.h"
 
 static const char *TAG = "APP_STATE";
 
@@ -25,6 +29,19 @@ void app_state_manager_begin(void) {
     app_state.last_mqtt_connect_time = 0;
     
     ESP_LOGI(TAG, "Application State Manager initialized");
+}
+
+void app_state_init_feature_managers(void) {
+    ESP_LOGI(TAG, "Initializing feature managers...");
+    
+    // Initialize all MQTT-based feature managers
+    EnergyDataManager::begin();
+    DeviceControlManager::begin();
+    BinCollectionManager::begin();
+    MOTDManager::init();
+    WeatherDataManager::begin();
+    
+    ESP_LOGI(TAG, "Feature managers initialized");
 }
 
 void app_state_manager_process(void) {

@@ -17,7 +17,7 @@ bool WeatherDataManager::humidity_changed = false;
 bool WeatherDataManager::frost_risk_changed = false;
 bool WeatherDataManager::initialized = false;
 
-void WeatherDataManager::init() {
+void WeatherDataManager::begin() {
     if (initialized) return;
     
     current_temperature = getDefaultTemperature();
@@ -37,7 +37,7 @@ void WeatherDataManager::init() {
 
 void WeatherDataManager::updateTemperature(float temp_celsius) {
     if (!initialized) {
-        init();
+        begin();
     }
     
     // Only update if the temperature has actually changed (with small tolerance)
@@ -50,7 +50,7 @@ void WeatherDataManager::updateTemperature(float temp_celsius) {
 
 float WeatherDataManager::getCurrentTemperature() {
     if (!initialized) {
-        init();
+        begin();
     }
     return current_temperature;
 }
@@ -61,7 +61,7 @@ bool WeatherDataManager::hasTemperatureChanged() {
 
 void WeatherDataManager::updateHumidity(float humidity_percent) {
     if (!initialized) {
-        init();
+        begin();
     }
     
     // Clamp humidity to valid range
@@ -78,7 +78,7 @@ void WeatherDataManager::updateHumidity(float humidity_percent) {
 
 float WeatherDataManager::getCurrentHumidity() {
     if (!initialized) {
-        init();
+        begin();
     }
     return current_humidity;
 }
@@ -89,7 +89,7 @@ bool WeatherDataManager::hasHumidityChanged() {
 
 void WeatherDataManager::updateFrostRisk(bool frost_risk) {
     if (!initialized) {
-        init();
+        begin();
     }
     
     // Only update if frost risk has actually changed
@@ -102,7 +102,7 @@ void WeatherDataManager::updateFrostRisk(bool frost_risk) {
 
 bool WeatherDataManager::getFrostRisk() {
     if (!initialized) {
-        init();
+        begin();
     }
     return frost_risk_active;
 }
@@ -123,7 +123,7 @@ bool WeatherDataManager::hasAnyDataChanged() {
 
 std::string WeatherDataManager::getTemperatureString() {
     if (!initialized) {
-        init();
+        begin();
     }
     
     std::stringstream ss;
@@ -133,7 +133,7 @@ std::string WeatherDataManager::getTemperatureString() {
 
 std::string WeatherDataManager::getHumidityString() {
     if (!initialized) {
-        init();
+        begin();
     }
     
     std::stringstream ss;
@@ -143,7 +143,7 @@ std::string WeatherDataManager::getHumidityString() {
 
 std::string WeatherDataManager::getFrostRiskString() {
     if (!initialized) {
-        init();
+        begin();
     }
     
     return frost_risk_active ? "FROST RISK" : "NO FROST";

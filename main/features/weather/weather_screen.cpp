@@ -12,7 +12,7 @@ static lv_obj_t* icon_label = NULL;
 
 void weather_screen_init(void) {
     // Initialise weather data manager
-    WeatherDataManager::init();
+    WeatherDataManager::begin();
     
     // Create screen
     weather_screen = lv_obj_create(NULL);

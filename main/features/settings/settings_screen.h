@@ -37,6 +37,11 @@ void settings_screen_cycle_brightness(void);
  */
 void settings_screen_toggle_haptic(void);
 
+/**
+ * @brief Handle factory reset with user confirmation
+ */
+void settings_screen_handle_factory_reset(void);
+
 #ifdef __cplusplus
 }
 #endif

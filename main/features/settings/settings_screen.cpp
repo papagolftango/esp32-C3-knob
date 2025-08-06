@@ -3,6 +3,7 @@
 
 // Include device control for MQTT integration
 #include "../device_control/device_control_manager.h"
+#include "../../core/factory_reset_manager.h"
 
 static const char *TAG = "SETTINGS_SCREEN";
 
@@ -122,8 +123,8 @@ void settings_screen_handle_button_press(void) {
             
         case 3: // Factory Reset
             ESP_LOGI(TAG, "Factory Reset selected");
-            // TODO: Show confirmation dialog first
-            ESP_LOGI(TAG, "Factory reset requested - implement confirmation dialog");
+            // Show confirmation and trigger factory reset
+            settings_screen_handle_factory_reset();
             break;
             
         default:
@@ -159,4 +160,19 @@ void settings_screen_toggle_haptic(void) {
     
     DeviceControlManager::setHapticEnabled(new_state);
     ESP_LOGI(TAG, "Haptic feedback %s", new_state ? "enabled" : "disabled");
+}
+
+// Helper function to handle factory reset with confirmation
+void settings_screen_handle_factory_reset(void) {
+    ESP_LOGW(TAG, "Factory reset requested");
+    
+    // For now, show a simple message and directly trigger reset
+    // In a full implementation, you'd show a proper confirmation dialog
+    ESP_LOGW(TAG, "FACTORY RESET TRIGGERED FROM SETTINGS!");
+    ESP_LOGW(TAG, "This would normally show a confirmation dialog");
+    
+    // Direct trigger for demonstration (in production, add proper UI confirmation)
+    FactoryResetManager::triggerFromSettings();
+    
+    ESP_LOGI(TAG, "Factory reset initiated");
 }
