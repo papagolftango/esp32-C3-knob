@@ -14,10 +14,12 @@ A professional knob interface built on ESP32-S3-Knob-Touch-LCD-1.8 with 360x360 
 - **DRV2605 haptic feedback** for tactile interactions
 - **Rotary encoder** for precise navigation (GPIO7/8)
 - **LVGL 8.3.0** graphics with multi-screen UI system
-- **EmonTX3 integration** for real-time energy monitoring
+- **EmonTX3 integration** for real-time energy monitoring with daily peak tracking
+- **Bin collection management** with visual status indicators and state tracking
+- **MOTD ticker** with scrolling news ticker functionality via MQTT
 - **WiFiManager** for secure credential storage (no hardcoded passwords)
 - **MQTT client** with auto-reconnection and topic routing
-- **Peak tracking** with daily reset functionality
+- **Peak tracking** with daily reset functionality and kWh accumulation
 - **Mock mode** for development without EmonTX3 hardware
 - **Professional architecture** with feature-based component structure
 
@@ -82,8 +84,17 @@ A professional knob interface built on ESP32-S3-Knob-Touch-LCD-1.8 with 360x360 
 ESP32-S3-Knob/
 ├── main/
 │   ├── main.cpp              # Main application code
+│   ├── core/                 # Hardware abstraction
+│   │   ├── mqtt_manager.*    # MQTT client and topic routing
+│   │   ├── wifi_manager.*    # WiFi management
+│   │   └── hardware.*        # Hardware initialisation
 │   ├── features/             # Feature modules
-│   └── core/                 # Hardware abstraction
+│   │   ├── energy/           # Energy monitoring with peak tracking
+│   │   ├── house/            # House management (bins, MOTD ticker)
+│   │   ├── weather/          # Weather display
+│   │   ├── clock/            # Clock and time display
+│   │   └── settings/         # Device settings
+│   └── ui/                   # UI components and screens
 ├── components/               # ESP-IDF components
 ├── include/
 │   └── lv_conf.h            # LVGL configuration
@@ -92,7 +103,8 @@ ESP32-S3-Knob/
 ├── sdkconfig                # ESP-IDF configuration
 ├── .gitignore              # Git ignore rules
 ├── WIFI_SETUP.md           # WiFi setup guide
-├── SQUARELINE_INTEGRATION.md # SquareLine Studio guide
+├── MQTT_SETUP.md           # MQTT configuration guide
+├── HOME_KNOB_TOPICS_GUIDE.md # MQTT topics documentation
 └── README.md               # This file
 ```
 
@@ -122,7 +134,7 @@ This project is prepared for SquareLine Studio UI design:
 1. **Create new project** with these settings:
    - Board: ESP32
    - Resolution: 360 x 360
-   - Color Depth: 16 bit
+   - Colour Depth: 16 bit
    - LVGL Version: 8.3.0
 
 2. **Export to** `src/ui/` folder
@@ -171,13 +183,16 @@ pio run -t clean           # Clean build files
 ```
 
 ### Memory Usage
-- **Flash:** ~1.2MB (of 4MB available)
+- **Flash:** ~1.64MB (of 4MB available) - 21% usage
 - **RAM:** ~48KB LVGL buffer + application
 - **PSRAM:** Not required for basic operation
 
 ## 🎯 Use Cases
 
 - **Smart home controls** - HVAC, lighting, music
+- **Energy monitoring** - Real-time consumption tracking with daily peaks
+- **Household management** - Bin collection scheduling and notifications
+- **Information display** - Scrolling news ticker and status updates
 - **Industrial interfaces** - Machine control panels
 - **Audio equipment** - Volume, EQ, mixing controls  
 - **IoT dashboards** - Sensor monitoring and control

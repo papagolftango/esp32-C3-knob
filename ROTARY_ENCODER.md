@@ -116,7 +116,7 @@ Encoder button pressed
 ### **Troubleshooting:**
 - **No rotation detected:** Check wiring and pullup resistors
 - **Wrong direction:** Swap A and B pins
-- **Bouncy behavior:** Encoder may need hardware debouncing capacitors
+- **Bouncy behaviour:** Encoder may need hardware debouncing capacitors
 - **Missed steps:** Reduce rotation speed or adjust sensitivity
 
 The rotary encoder provides intuitive, tactile navigation perfect for the knob form factor! 🎛️

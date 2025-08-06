@@ -14,6 +14,7 @@ Your ESP32 knob listens for these commands:
 | `home/knob/command` | General device commands | `reboot`, `factory_reset`, `wifi_reset`, `status` | `reboot` |
 | `home/knob/brightness` | Screen brightness control | `0-100` (percentage) | `75` |
 | `home/knob/haptic` | Haptic feedback control | `on`, `off`, `toggle`, `true`, `false` | `on` |
+| `home/motd` | Message of the Day ticker | Any text string | `Welcome to Smart Home!` |
 
 ### **Outgoing Status Topics** (Publish)
 Your ESP32 knob publishes these status updates:
@@ -33,6 +34,9 @@ mosquitto_pub -h your-broker -t "home/knob/brightness" -m "50"
 
 # Enable haptic feedback
 mosquitto_pub -h your-broker -t "home/knob/haptic" -m "on"
+
+# Update MOTD ticker message
+mosquitto_pub -h your-broker -t "home/motd" -m "Energy usage today: 24.5 kWh • Bin collection tomorrow"
 
 # Reboot the device
 mosquitto_pub -h your-broker -t "home/knob/command" -m "reboot"
@@ -64,6 +68,26 @@ automation:
       data:
         topic: "home/knob/brightness"
         payload: "100"
+
+  - alias: "Update MOTD with daily energy summary"
+    trigger:
+      platform: time
+      at: "23:30:00"
+    action:
+      service: mqtt.publish
+      data:
+        topic: "home/motd"
+        payload: "Today's Energy: {{ states('sensor.daily_energy_kwh') }} kWh • Peak: {{ states('sensor.peak_import') }} W • Tomorrow: Bin Collection Day"
+
+  - alias: "Morning MOTD weather update"
+    trigger:
+      platform: time
+      at: "08:00:00"
+    action:
+      service: mqtt.publish
+      data:
+        topic: "home/motd"
+        payload: "Good Morning! • {{ states('weather.home') }} {{ state_attr('weather.home', 'temperature') }}°C • Have a great day!"
 ```
 
 ### **From Node-RED**
@@ -122,6 +146,34 @@ External System        MQTT Broker         ESP32 Knob         Settings Screen
      │                      │                   ├─ cycleBrightness()│
      │                      │                   ├─ publishStatus() │
      │                      │←─────────────────│                   │
+```
+
+## 📺 MOTD Ticker Feature
+
+### **Visual Display**
+- **Location**: Bottom of house screen in dedicated container
+- **Style**: Green scrolling text on dark background
+- **Timing**: Independent 80ms scroll rate (different from bin icon flashing)
+- **Behaviour**: Auto-scrolls long messages, centers short messages
+
+### **MQTT Integration**
+- **Topic**: `home/motd` 
+- **Format**: Plain text string
+- **Update**: Real-time display when new message received
+- **Default**: "Welcome to Smart Home • Bin Collection Status • Energy Monitoring Active"
+
+### **Use Cases**
+- **Daily summaries**: Energy usage, weather, calendar events
+- **Notifications**: Important alerts, reminders, system status
+- **Information display**: News updates, announcements, tips
+- **Integration**: Home Assistant automations, Node-RED flows
+
+### **Example Messages**
+```
+Energy today: 24.5 kWh • Peak: 3.2 kW • Bin collection tomorrow
+Good morning! Partly cloudy 18°C • Solar generating 2.1 kW
+Reminder: Check garden irrigation • Guest arriving 3 PM today
+System update available • WiFi signal excellent • All sensors OK
 ```
 
 ## 🏗️ Implementation Details
