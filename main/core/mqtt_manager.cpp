@@ -25,7 +25,7 @@ const char* MQTTManager::topics[] = {
     // Energy monitoring namespace (emon/emontx3/*)
     "emon/emontx3/balance",     
     "emon/emontx3/solar",       
-    "emon/emontx3/vrms",        
+    "emon/emontx3/import",        
     "emon/emontx3/used",        
     "emon/emontx3/tariff"       
 };
