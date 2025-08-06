@@ -13,6 +13,8 @@ idf_component_register(SRCS "main.cpp"
                             "features/energy/energy_data_manager.cpp"
                             "features/weather/weather_screen.cpp"
                             "features/house/house_screen.cpp"
+                            "features/house/bin_collection_manager.cpp"
+                            "features/house/motd_manager.cpp"
                             "features/device_control/device_control_manager.cpp"
                        INCLUDE_DIRS "." "core" "ui" "features"
                        REQUIRES lvgl esp_driver_spi esp_driver_gpio esp_driver_i2c esp_wifi mqtt nvs_flash freertos wifi_provisioning)

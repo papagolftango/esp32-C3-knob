@@ -22,6 +22,7 @@
 // MQTT integration
 #include "features/energy/energy_data_manager.h"
 #include "features/device_control/device_control_manager.h"
+#include "features/house/bin_collection_manager.h"
 
 static const char *TAG = "ESP32_KNOB";
 
@@ -59,6 +60,7 @@ extern "C" void app_main(void) {
     MQTTManager::begin();
     EnergyDataManager::begin();
     DeviceControlManager::begin();
+    BinCollectionManager::begin();
     
     // Initialize Application State Manager
     ESP_LOGI(TAG, "Initializing Application State Manager...");
