@@ -1,5 +1,7 @@
 #include "energy_data_manager.h"
 #include "../../core/mqtt_manager.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 static const char *TAG = "ENERGY_DATA";
 
@@ -8,7 +10,7 @@ float EnergyDataManager::balance = 0.0f;
 float EnergyDataManager::solar = 0.0f;
 float EnergyDataManager::vrms = 0.0f;
 float EnergyDataManager::used = 0.0f;
-String EnergyDataManager::tariff = "unknown";
+std::string EnergyDataManager::tariff = "unknown";
 
 bool EnergyDataManager::data_changed = false;
 unsigned long EnergyDataManager::last_update = 0;
@@ -22,10 +24,10 @@ void EnergyDataManager::begin() {
     ESP_LOGI(TAG, "Energy Data Manager initialized - registered for emon/emontx3/* topics");
 }
 
-void EnergyDataManager::handleMQTTMessage(const String& topic, const String& message) {
+void EnergyDataManager::handleMQTTMessage(const std::string& topic, const std::string& message) {
     ESP_LOGI(TAG, "Processing energy message: %s = %s", topic.c_str(), message.c_str());
     
-    float value = message.toFloat();
+    float value = std::stof(message);
     bool updated = false;
     
     if (topic == "emon/emontx3/balance") {
@@ -80,16 +82,16 @@ void EnergyDataManager::handleMQTTMessage(const String& topic, const String& mes
     
     if (updated) {
         data_changed = true;
-        last_update = millis();
+        last_update = xTaskGetTickCount() * portTICK_PERIOD_MS;
         
         // Log comprehensive energy status periodically
         static unsigned long last_status_log = 0;
-        if (millis() - last_status_log > 30000) { // Every 30 seconds
+        if ((xTaskGetTickCount() * portTICK_PERIOD_MS) - last_status_log > 30000) { // Every 30 seconds
             ESP_LOGI(TAG, "=== Energy Status ===");
             ESP_LOGI(TAG, "Balance: %.2f W, Solar: %.2f W, Used: %.2f W", balance, solar, used);
             ESP_LOGI(TAG, "Voltage: %.2f V, Tariff: %s", vrms, tariff.c_str());
             ESP_LOGI(TAG, "==================");
-            last_status_log = millis();
+            last_status_log = xTaskGetTickCount() * portTICK_PERIOD_MS;
         }
     }
 }
@@ -105,7 +107,7 @@ bool EnergyDataManager::hasDataChanged() {
 bool EnergyDataManager::isDataValid() {
     // Consider data valid if we've received updates recently (within 5 minutes)
     const unsigned long TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-    return (last_update > 0) && (millis() - last_update < TIMEOUT_MS);
+    return (last_update > 0) && ((xTaskGetTickCount() * portTICK_PERIOD_MS) - last_update < TIMEOUT_MS);
 }
 
 bool EnergyDataManager::isValidPower(float value) {

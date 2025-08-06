@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lvgl.h"
+#include "../core/rotary.h"  // For rotary_event_t
 
 typedef enum {
     SCREEN_HELLO_WORLD = 0,
@@ -53,6 +54,12 @@ void screen_manager_handle_rotation(int direction);
  * @brief Handle rotary encoder button press
  */
 void screen_manager_handle_button_press(void);
+
+/**
+ * @brief Rotary encoder event handler (for use as callback)
+ * @param event The rotary encoder event
+ */
+void screen_manager_rotary_event_handler(rotary_event_t event);
 
 #ifdef __cplusplus
 }

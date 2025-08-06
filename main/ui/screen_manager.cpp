@@ -113,3 +113,21 @@ void screen_manager_handle_button_press(void) {
             break;
     }
 }
+
+void screen_manager_rotary_event_handler(rotary_event_t event) {
+    ESP_LOGI(TAG, "Rotary event: %d", event);
+    
+    switch (event) {
+        case ROTARY_EVENT_CW:
+            screen_manager_next();
+            break;
+        case ROTARY_EVENT_CCW:
+            screen_manager_previous();
+            break;
+        case ROTARY_EVENT_BUTTON:
+            screen_manager_handle_button_press();
+            break;
+        default:
+            break;
+    }
+}

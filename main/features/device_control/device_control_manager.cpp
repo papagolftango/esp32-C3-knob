@@ -1,6 +1,13 @@
 #include "device_control_manager.h"
 #include "../../core/display.h"  // For brightness control
 #include "../settings/settings_screen.h"  // For settings integration
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <esp_system.h>
+#include <esp_netif.h>
+#include <esp_heap_caps.h>
+#include <string>
+#include <cstring>
 
 static const char *TAG = "DEVICE_CONTROL";
 
@@ -20,22 +27,22 @@ void DeviceControlManager::begin() {
     ESP_LOGI(TAG, "Device Control Manager initialized - registered for home/knob/* topics");
 }
 
-void DeviceControlManager::handleMQTTMessage(const String& topic, const String& message) {
-    ESP_LOGI(TAG, "Processing device control message: %s = %s", topic.c_str(), message.c_str());
+void DeviceControlManager::handleMQTTMessage(const char* topic, const char* message) {
+    ESP_LOGI(TAG, "Processing device control message: %s = %s", topic, message);
     
-    if (topic == "home/knob/command") {
+    if (strcmp(topic, "home/knob/command") == 0) {
         processDeviceCommand(message);
-    } else if (topic == "home/knob/brightness") {
+    } else if (strcmp(topic, "home/knob/brightness") == 0) {
         processBrightnessCommand(message);
-    } else if (topic == "home/knob/haptic") {
+    } else if (strcmp(topic, "home/knob/haptic") == 0) {
         processHapticCommand(message);
     } else {
-        ESP_LOGW(TAG, "Unknown device control topic: %s", topic.c_str());
+        ESP_LOGW(TAG, "Unknown device control topic: %s", topic);
     }
 }
 
-void DeviceControlManager::processBrightnessCommand(const String& message) {
-    int brightness = message.toInt();
+void DeviceControlManager::processBrightnessCommand(const char* message) {
+    int brightness = atoi(message);
     
     // Validate range (0-100%)
     if (brightness < 0 || brightness > 100) {
@@ -47,17 +54,17 @@ void DeviceControlManager::processBrightnessCommand(const String& message) {
     ESP_LOGI(TAG, "Brightness set to %d%% via MQTT", brightness);
 }
 
-void DeviceControlManager::processHapticCommand(const String& message) {
+void DeviceControlManager::processHapticCommand(const char* message) {
     bool enable = false;
     
-    if (message == "on" || message == "true" || message == "1" || message == "enable") {
+    if (strcmp(message, "on") == 0 || strcmp(message, "true") == 0 || strcmp(message, "1") == 0 || strcmp(message, "enable") == 0) {
         enable = true;
-    } else if (message == "off" || message == "false" || message == "0" || message == "disable") {
+    } else if (strcmp(message, "off") == 0 || strcmp(message, "false") == 0 || strcmp(message, "0") == 0 || strcmp(message, "disable") == 0) {
         enable = false;
-    } else if (message == "toggle") {
+    } else if (strcmp(message, "toggle") == 0) {
         enable = !haptic_enabled;
     } else {
-        ESP_LOGW(TAG, "Invalid haptic command: %s (use: on/off/toggle)", message.c_str());
+        ESP_LOGW(TAG, "Invalid haptic command: %s (use: on/off/toggle)", message);
         return;
     }
     
@@ -65,30 +72,30 @@ void DeviceControlManager::processHapticCommand(const String& message) {
     ESP_LOGI(TAG, "Haptic feedback %s via MQTT", enable ? "enabled" : "disabled");
 }
 
-void DeviceControlManager::processDeviceCommand(const String& message) {
-    ESP_LOGI(TAG, "Processing device command: %s", message.c_str());
+void DeviceControlManager::processDeviceCommand(const char* message) {
+    ESP_LOGI(TAG, "Processing device command: %s", message);
     
-    if (message == "reboot" || message == "restart") {
+    if (strcmp(message, "reboot") == 0 || strcmp(message, "restart") == 0) {
         ESP_LOGI(TAG, "Reboot command received - restarting in 2 seconds");
         vTaskDelay(pdMS_TO_TICKS(2000));
         esp_restart();
         
-    } else if (message == "factory_reset") {
+    } else if (strcmp(message, "factory_reset") == 0) {
         ESP_LOGI(TAG, "Factory reset command received");
         // TODO: Implement factory reset functionality
         // This should match the settings screen factory reset
         
-    } else if (message == "wifi_reset") {
+    } else if (strcmp(message, "wifi_reset") == 0) {
         ESP_LOGI(TAG, "WiFi reset command received");
         // TODO: Implement WiFi credentials reset
         // This should match the settings screen WiFi reset
         
-    } else if (message == "status") {
+    } else if (strcmp(message, "status") == 0) {
         ESP_LOGI(TAG, "Status request received");
         publishStatus();
         
     } else {
-        ESP_LOGW(TAG, "Unknown device command: %s", message.c_str());
+        ESP_LOGW(TAG, "Unknown device command: %s", message);
     }
 }
 
@@ -129,23 +136,38 @@ void DeviceControlManager::publishStatus() {
     }
     
     // Create JSON status message
-    String status = "{";
-    status += "\"wifi\":true,";
-    status += "\"mqtt\":true,";
-    status += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
-    status += "\"brightness\":" + String(current_brightness) + ",";
-    status += "\"haptic\":" + String(haptic_enabled ? "true" : "false") + ",";
-    status += "\"uptime\":" + String(millis()/1000) + ",";
-    status += "\"free_heap\":" + String(ESP.getFreeHeap());
-    status += "}";
+    char status_buffer[512];
+    esp_netif_ip_info_t ip_info;
+    esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
     
-    MQTTManager::publish("home/knob/status", status, true);
+    uint32_t uptime_seconds = (xTaskGetTickCount() * portTICK_PERIOD_MS) / 1000;
+    uint32_t free_heap = esp_get_free_heap_size();
+    
+    snprintf(status_buffer, sizeof(status_buffer), 
+        "{"
+        "\"wifi\":true,"
+        "\"mqtt\":true,"
+        "\"ip\":\"%d.%d.%d.%d\","
+        "\"brightness\":%d,"
+        "\"haptic\":%s,"
+        "\"uptime\":%lu,"
+        "\"free_heap\":%lu"
+        "}",
+        IP2STR(&ip_info.ip),
+        current_brightness,
+        haptic_enabled ? "true" : "false",
+        (unsigned long)uptime_seconds,
+        (unsigned long)free_heap);
+    
+    MQTTManager::publish("home/knob/status", status_buffer, true);
     ESP_LOGI(TAG, "Published device status");
 }
 
 void DeviceControlManager::publishBrightness(int brightness) {
     if (MQTTManager::isConnected()) {
-        MQTTManager::publish("home/knob/brightness/status", String(brightness));
+        char brightness_str[16];
+        snprintf(brightness_str, sizeof(brightness_str), "%d", brightness);
+        MQTTManager::publish("home/knob/brightness/status", brightness_str);
     }
 }
 

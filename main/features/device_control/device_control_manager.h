@@ -4,7 +4,7 @@
 #include "../../core/mqtt_manager.h"
 
 /**
- * Device Control Manager - Handles home/knob/* MQTT topics
+ * Device Control Manager - Handles home/knob/ MQTT topics
  * 
  * This manager processes device control commands received via MQTT
  * and integrates with the settings screen functionality.
@@ -16,7 +16,7 @@ public:
     static void begin();
     
     // MQTT message handler for device control topics
-    static void handleMQTTMessage(const String& topic, const String& message);
+    static void handleMQTTMessage(const char* topic, const char* message);
     
     // Publish device status to MQTT
     static void publishStatus();
@@ -26,7 +26,7 @@ public:
     // Settings integration
     static void setBrightness(int brightness);    // 0-100%
     static void setHapticEnabled(bool enabled);   // true/false
-    static void processCommand(const String& command);
+    static void processCommand(const char* command);
     
     // Current settings
     static int getCurrentBrightness() { return current_brightness; }
@@ -37,7 +37,7 @@ private:
     static bool haptic_enabled;     // Haptic feedback enabled/disabled
     
     // Command processing
-    static void processBrightnessCommand(const String& message);
-    static void processHapticCommand(const String& message);
-    static void processDeviceCommand(const String& message);
+    static void processBrightnessCommand(const char* message);
+    static void processHapticCommand(const char* message);
+    static void processDeviceCommand(const char* message);
 };
