@@ -30,7 +30,12 @@ const char* MQTTManager::topics[] = {
     "emon/emontx3/tariff",
     
     // House information namespace (home/*)
-    "home/motd"
+    "home/motd",
+    
+    // Weather namespace (home/weather/*)
+    "home/weather/temperature",
+    "home/weather/humidity", 
+    "home/weather/frost_risk"
 };
 
 const int MQTTManager::num_topics = sizeof(MQTTManager::topics) / sizeof(MQTTManager::topics[0]);

@@ -17,6 +17,11 @@ void weather_screen_init(void);
 void weather_screen_show(void);
 
 /**
+ * @brief Update weather display with current data
+ */
+void updateWeatherDisplay(void);
+
+/**
  * @brief Handle rotary encoder button press on weather screen
  */
 void weather_screen_handle_button_press(void);
